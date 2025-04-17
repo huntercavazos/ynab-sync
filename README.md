@@ -60,7 +60,7 @@ Set environment variables in Portainer or a Compose file, then run the container
 - Schedule hourly syncs using cron
 - Rotate logs with logrotate
 
----
+<br>
 
 ## Under the Hood
 
@@ -72,19 +72,19 @@ Features:
 - Transactions updated if already synced
 - Stale transactions removed from target budget
 
----
+<br>
 
 ## Testing
 
 Coming soon: Unit tests using pytest to cover sync logic and mock YNAB API responses.
 
----
+<br>
 
 ## License
 
 MIT License. Do what you want, just don’t blame me if it breaks your budget 😉
 
----
+<br>
 
 ## Support
 
