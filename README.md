@@ -24,8 +24,6 @@ Sync shared category transactions from one YNAB budget to another. Perfect for c
 
 Configure the following environment variables (in Portainer, `.env`, or `docker-compose.yml`):
 
-```bash
-
 | Variable             | Description                          |
 |----------------------|--------------------------------------|
 | `SOURCE_API_KEY`     | YNAB token for source budget         |
@@ -34,7 +32,6 @@ Configure the following environment variables (in Portainer, `.env`, or `docker-
 | `TARGET_BUDGET_ID`   | Budget ID to sync into               |
 | `SHARED_CATEGORY_ID` | Category ID to track in source       |
 | `SHARED_ACCOUNT_ID`  | Account ID to sync into in target    |
-```
 
 ### 🐳 Docker Deployment
 
