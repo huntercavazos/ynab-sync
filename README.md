@@ -34,11 +34,12 @@ Configure the following environment variables (in Portainer, `.env`, or `docker-
 | `TARGET_BUDGET_ID`   | Budget ID to sync into               |
 | `SHARED_CATEGORY_ID` | Category ID to track in source       |
 | `SHARED_ACCOUNT_ID`  | Account ID to sync into in target    |
+```
 
 ### 🐳 Docker Deployment
 
 ```bash
-docker pull yourdockerhubuser/ynab-shared-sync:latest
+docker pull cavazosapps/ynab-shared-sync:latest
 ```
 Or use Docker Compose:
 
