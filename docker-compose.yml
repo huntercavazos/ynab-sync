@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  ynab-sync:
+    image: cavazosapps/ynab-sync:latest
+    container_name: ynab-sync
+    restart: unless-stopped
+    environment:
+      - SOURCE_API_KEY=your_source_api_key
+      - TARGET_API_KEY=your_target_api_key
+      - SOURCE_BUDGET_ID=your_source_budget_id
+      - TARGET_BUDGET_ID=your_target_budget_id
+      - SHARED_CATEGORY_ID=your_shared_category_id
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
