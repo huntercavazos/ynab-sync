@@ -1,27 +1,45 @@
-# 🧾 YNAB Sync - Shared Category Syncing
+# 🧾 YNAB Sync - Shared Transaction Syncing
 
-This is a lightweight Python app that syncs transactions between two YNAB budgets for a **shared category**. It's designed for couples or roommates who want to track shared expenses but keep separate YNAB accounts.
+Sync shared category transactions from one YNAB budget to another. Perfect for couples or shared financial tracking where each user has their own YNAB account and budget.
 
-## 🔧 Features
+## What It Does
 
-- ✅ Automatically syncs transactions in a designated **shared category**
-- ✅ Avoids duplicates using a smart `import_id` convention
-- ✅ Updates or deletes previously synced transactions as needed
-- ✅ Runs hourly via cron inside a Docker container
-- ✅ Supports environment-based configuration for use in Docker/Portainer
+- Copies all transactions from a shared category in Budget A
+- Pushes them into a designated account in Budget B
+- Updates existing transactions or deletes stale ones
+- Supports cron-based hourly syncing in a Docker container
+- Designed for use with [Portainer](https://www.portainer.io/) and Docker
 
 ---
 
-## Usage
+## Getting Started
 
-### 1. 🐳 Run with Docker
+### Prerequisites
 
-You can pull the image directly:
+- Two separate YNAB access tokens (one for each budget)
+- Budget and category IDs for both sides
+- Docker + Portainer (recommended for deployment)
+
+### Environment Variables
+
+Configure the following environment variables (in Portainer, `.env`, or `docker-compose.yml`):
 
 ```bash
-docker pull cavazosapps/ynab-sync:latest
-```
 
+| Variable             | Description                          |
+|----------------------|--------------------------------------|
+| `SOURCE_API_KEY`     | YNAB token for source budget         |
+| `TARGET_API_KEY`     | YNAB token for target budget         |
+| `SOURCE_BUDGET_ID`   | Budget ID to copy from               |
+| `TARGET_BUDGET_ID`   | Budget ID to sync into               |
+| `SHARED_CATEGORY_ID` | Category ID to track in source       |
+| `SHARED_ACCOUNT_ID`  | Account ID to sync into in target    |
+
+### 🐳 Docker Deployment
+
+```bash
+docker pull yourdockerhubuser/ynab-shared-sync:latest
+```
 Or use Docker Compose:
 
 ```yaml
@@ -37,34 +55,40 @@ services:
       - SHARED_CATEGORY_ID=...
       - SHARED_ACCOUNT_ID=...
 ```
-You can also set environment variables via the Portainer UI.
 
-### 2. 🛠️ Environment Variables
+Set environment variables in Portainer or a Compose file, then run the container. It will:
 
-| Variable           | Description                              |
-|--------------------|------------------------------------------|
-| SOURCE_API_KEY     | Personal access token for source account |
-| TARGET_API_KEY     | Personal access token for target account |
-| SOURCE_BUDGET_ID   | Budget ID from source YNAB account       |
-| TARGET_BUDGET_ID   | Budget ID from target YNAB account       |
-| SHARED_CATEGORY_ID | Category ID to watch in source account   |
-| SHARED_ACCOUNT_ID  | Target account ID to create transactions |
+- Run a sync immediately on startup
+- Schedule hourly syncs using cron
+- Rotate logs with logrotate
 
-### 3. 🕒 How It Works
+---
 
-- On container startup, it immediately runs the sync once.
-- Then, it runs every hour via cron.
-- Logs are stored in /var/log/ynab-sync/sync.log.
+## Under the Hood
 
-## 📜 License
+This project uses the official YNAB Python SDK to communicate with the YNAB API.
+
+Features:
+
+- Sync is idempotent: uses import_id to track duplicates
+- Transactions updated if already synced
+- Stale transactions removed from target budget
+
+---
+
+## Testing
+
+Coming soon: Unit tests using pytest to cover sync logic and mock YNAB API responses.
+
+---
+
+## License
 
 MIT License. Do what you want, just don’t blame me if it breaks your budget 😉
 
-## 🤝 Contributing
+---
 
-Pull requests are welcome! Let’s make YNAB syncing smarter together.
-
-## ☕ Support
+## Support
 
 If you find this project helpful, consider supporting me:
 
