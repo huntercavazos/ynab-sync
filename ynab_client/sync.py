@@ -86,7 +86,10 @@ def sync_transactions():
 
     # Filter transactions belonging to the shared category
     shared_txns = [txn for txn in source_txns if txn.category_id == shared_category_id]
-    log.info(f"Found {len(shared_txns)} shared transactions to sync")
+
+    if not shared_txns:
+        log.info("No shared transactions found to sync")
+        return
 
     try:
         # Fetch transactions from the target budget
@@ -127,6 +130,7 @@ def sync_transactions():
                 })
         else:
             new_txns.append(NewTransaction(
+                account_id=shared_account_id,
                 date=txn.var_date,
                 amount=txn.amount,
                 payee_name=txn.payee_name,
@@ -135,6 +139,9 @@ def sync_transactions():
                 approved=txn.approved,
                 import_id=import_id
             ))
+
+    if new_txns or update_txns:
+        log.info(f"Found {len(new_txns) + len(update_txns)} shared transactions to sync")
 
     # Batch create new transactions
     if new_txns:
@@ -169,5 +176,8 @@ def sync_transactions():
                 log.info(f"Deleted stale transaction: {txn.import_id}")
             except ApiException as e:
                 log.error(f"Failed to delete stale transaction {txn.import_id}: {e}")
+
+    if not new_txns and not update_txns and not stale_txns:
+        log.info("No changes were necessary.")
 
     log.info("Sync complete.")
