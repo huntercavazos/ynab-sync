@@ -36,7 +36,7 @@ Configure the following environment variables (in Portainer, `.env`, or `docker-
 ### 🐳 Docker Deployment
 
 ```bash
-docker pull cavazosapps/ynab-shared-sync:latest
+docker pull cavazosapps/ynab-sync:latest
 ```
 Or use Docker Compose:
 
