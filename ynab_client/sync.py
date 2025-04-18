@@ -115,8 +115,7 @@ def sync_transactions():
                 existing.amount != txn.amount or
                 existing.payee_name != txn.payee_name or
                 existing.memo != txn.memo or
-                existing.cleared != txn.cleared or
-                existing.approved != txn.approved
+                existing.cleared != txn.cleared
             ):
                 update_txns.append({
                     "id": existing.id,
@@ -125,8 +124,7 @@ def sync_transactions():
                     "amount": txn.amount,
                     "payee_name": txn.payee_name,
                     "memo": txn.memo,
-                    "cleared": txn.cleared,
-                    "approved": txn.approved
+                    "cleared": txn.cleared
                 })
         else:
             new_txns.append(NewTransaction(
@@ -136,7 +134,6 @@ def sync_transactions():
                 payee_name=txn.payee_name,
                 memo=txn.memo,
                 cleared=txn.cleared,
-                approved=txn.approved,
                 import_id=import_id
             ))
 
