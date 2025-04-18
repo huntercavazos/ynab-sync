@@ -10,7 +10,8 @@ echo "Running YNAB sync at container startup..."
 
 # Start cron
 echo "Starting cron..."
-cron
+printenv >> /etc/environment
+cron -f
 
 # Tail the log
 tail -f /var/log/ynab-sync/sync.log
