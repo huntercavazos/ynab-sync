@@ -1,136 +1,173 @@
-import os
-import sys
 import logging
-from datetime import date, timedelta
 from collections import defaultdict
+from datetime import date, timedelta
 
 import ynab
 from ynab.api.transactions_api import TransactionsApi
-from ynab.models.post_transactions_wrapper import PostTransactionsWrapper
-from ynab.models.put_transaction_wrapper import PutTransactionWrapper
-from ynab.models.new_transaction import NewTransaction
 from ynab.models.existing_transaction import ExistingTransaction
+from ynab.models.new_transaction import NewTransaction
+from ynab.models.post_transactions_wrapper import PostTransactionsWrapper
+from ynab.models.patch_transactions_wrapper import PatchTransactionsWrapper
 from ynab.rest import ApiException
-from dotenv import load_dotenv
 
-# Load .env file if present
-load_dotenv(dotenv_path="../.env")
-
-def get_env(key: str) -> str:
-    value = os.getenv(key)
-    if not value:
-        raise EnvironmentError(f"Missing required environment variable: {key}")
-    return value
+from ynab_client.config import CONFIG
 
 def create_api(token: str) -> TransactionsApi:
+    """
+    Create a YNAB Transactions API client.
+
+    Args:
+        token (str): The personal access token for the YNAB API.
+
+    Returns:
+        TransactionsApi: An instance of the TransactionsApi client.
+    """
     config = ynab.Configuration(access_token=token)
     return TransactionsApi(ynab.ApiClient(config))
 
 def generate_import_ids(transactions):
+    """
+    Generate unique import IDs for a list of transactions.
+
+    Args:
+        transactions (list): A list of transaction objects.
+
+    Returns:
+        list: A list of unique import IDs for the transactions.
+    """
     counter = defaultdict(int)
     import_ids = []
 
     for txn in transactions:
-        key = f"{txn.var_date}:{txn.amount}"
+        key = f"{txn.var_date}:{txn.amount}"  # Unique key based on transaction date and amount
         count = counter[key]
-        suffix = f":{count}" if count > 0 else ""
-        import_id = f"SYNCED:{key}{suffix}"
+        suffix = f":{count}" if count > 0 else ""  # Add a suffix if there are duplicate keys
+        import_id = f"SYNCED:{key}{suffix}"  # Format the import ID
         import_ids.append(import_id)
         counter[key] += 1
 
     return import_ids
 
 def sync_transactions():
+    """
+    Synchronize transactions between two YNAB budgets.
+
+    This function fetches transactions from a source budget, filters shared transactions,
+    and synchronizes them with a target budget. It handles creating, updating, and deleting
+    transactions in batches where possible.
+
+    Logs:
+        Logs the progress and any errors encountered during the synchronization process.
+    """
     log = logging.getLogger("ynab_sync")
     log.info("Starting sync process")
 
-    token_a = get_env("SOURCE_API_KEY")
-    token_b = get_env("TARGET_API_KEY")
-    budget_id_a = get_env("SOURCE_BUDGET_ID")
-    budget_id_b = get_env("TARGET_BUDGET_ID")
-    shared_category_id = get_env("SHARED_CATEGORY_ID")
-    shared_account_id = get_env("SHARED_ACCOUNT_ID")
+    # Retrieve configuration values
+    token_a = CONFIG["source_api_key"]
+    token_b = CONFIG["target_api_key"]
+    budget_id_a = CONFIG["source_budget_id"]
+    budget_id_b = CONFIG["target_budget_id"]
+    shared_category_id = CONFIG["shared_category_id"]
+    shared_account_id = CONFIG["shared_account_id"]
 
+    # Define the date range for transactions to sync
     since_date = date.today() - timedelta(days=3)
 
+    # Create API clients for source and target budgets
     api_a = create_api(token_a)
     api_b = create_api(token_b)
 
     try:
-        source_txns = api_a.get_transactions(
-            budget_id_a, since_date=since_date
-        ).data.transactions
+        # Fetch transactions from the source budget
+        source_txns = api_a.get_transactions(budget_id_a, since_date=since_date).data.transactions
     except ApiException as e:
         log.error(f"Error fetching transactions from SOURCE: {e}")
         return
 
-    shared_txns = [
-        txn for txn in source_txns if txn.category_id == shared_category_id
-    ]
+    # Filter transactions belonging to the shared category
+    shared_txns = [txn for txn in source_txns if txn.category_id == shared_category_id]
     log.info(f"Found {len(shared_txns)} shared transactions to sync")
 
     try:
-        target_txns = api_b.get_transactions(
-            budget_id_b, since_date=since_date
-        ).data.transactions
+        # Fetch transactions from the target budget
+        target_txns = api_b.get_transactions(budget_id_b, since_date=since_date).data.transactions
     except ApiException as e:
         log.error(f"Error fetching transactions from TARGET: {e}")
         return
 
+    # Generate unique import IDs for shared transactions
     import_ids = generate_import_ids(shared_txns)
+
+    # Group transactions by type
+    new_txns = []
+    update_txns = []
 
     for txn, import_id in zip(shared_txns, import_ids):
         existing = next((t for t in target_txns if t.import_id == import_id), None)
 
         if existing:
-            log.info(f"Updating existing transaction: {import_id}")
-            try:
-                updated_transaction = ExistingTransaction(
-                    account_id=shared_account_id,
-                    date=txn.var_date,
-                    amount=txn.amount,
-                    payee_name=txn.payee_name,
-                    memo=txn.memo,
-                    cleared=txn.cleared,
-                    approved=txn.approved
-                )
-                api_b.update_transaction(
-                    budget_id_b,
-                    existing.id,
-                    PutTransactionWrapper(transaction=updated_transaction)
-                )
-            except ApiException as e:
-                log.error(f"Failed to update transaction {import_id}: {e}")
+            # Only update if any relevant fields have changed
+            if (
+                existing.var_date != txn.var_date or
+                existing.amount != txn.amount or
+                existing.payee_name != txn.payee_name or
+                existing.memo != txn.memo or
+                existing.cleared != txn.cleared or
+                existing.approved != txn.approved
+            ):
+                update_txns.append({
+                    "id": existing.id,
+                    "account_id": shared_account_id,
+                    "date": txn.var_date,
+                    "amount": txn.amount,
+                    "payee_name": txn.payee_name,
+                    "memo": txn.memo,
+                    "cleared": txn.cleared,
+                    "approved": txn.approved
+                })
         else:
-            log.info(f"Creating new transaction: {import_id}")
-            try:
-                new_transaction = NewTransaction(
-                    account_id=shared_account_id,
-                    date=txn.var_date,
-                    amount=txn.amount,
-                    payee_name=txn.payee_name,
-                    memo=txn.memo,
-                    cleared=txn.cleared,
-                    approved=txn.approved,
-                    import_id=import_id
-                )
-                wrapper = PostTransactionsWrapper(transactions=[new_transaction])
-                api_b.create_transaction(budget_id_b, wrapper)
-            except ApiException as e:
-                log.error(f"Failed to create transaction {import_id}: {e}")
+            new_txns.append(NewTransaction(
+                date=txn.var_date,
+                amount=txn.amount,
+                payee_name=txn.payee_name,
+                memo=txn.memo,
+                cleared=txn.cleared,
+                approved=txn.approved,
+                import_id=import_id
+            ))
 
+    # Batch create new transactions
+    if new_txns:
+        log.info(f"Creating {len(new_txns)} new transactions...")
+        try:
+            wrapper = PostTransactionsWrapper(transactions=new_txns)
+            api_b.create_transaction(budget_id_b, wrapper)
+        except ApiException as e:
+            log.error(f"Failed to create transactions: {e}")
+
+    # Batch update existing transactions
+    if update_txns:
+        log.info(f"Updating {len(update_txns)} existing transactions...")
+        try:
+            patch_wrapper = PatchTransactionsWrapper(transactions=update_txns)
+            api_b.update_transactions(budget_id_b, patch_wrapper)
+        except ApiException as e:
+            log.error(f"Failed to update transactions: {e}")
+
+    # Identify and delete stale transactions in the target budget
     source_import_ids = set(import_ids)
+    stale_txns = [
+        txn for txn in target_txns
+        if txn.import_id and txn.import_id.startswith("SYNCED:") and txn.import_id not in source_import_ids
+    ]
 
-    for txn in target_txns:
-        if txn.import_id and txn.import_id.startswith("SYNCED:") and txn.import_id not in source_import_ids:
-            log.info(f"Deleting stale transaction: {txn.import_id}")
+    if stale_txns:
+        log.info(f"Deleting {len(stale_txns)} stale transactions...")
+        for txn in stale_txns:
             try:
                 api_b.delete_transaction(budget_id_b, txn.id)
+                log.info(f"Deleted stale transaction: {txn.import_id}")
             except ApiException as e:
                 log.error(f"Failed to delete stale transaction {txn.import_id}: {e}")
 
     log.info("Sync complete.")
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-    sync_transactions()
