@@ -28,7 +28,9 @@ def create_api(token: str) -> TransactionsApi:
 
 def generate_import_ids(transactions):
     """
-    Generate unique import IDs for a list of transactions.
+    Generate YNAB-compatible import IDs to support duplicate detection and matching with bank imports.
+
+    Format: YNAB:{amount}:{date}:{occurrence}
 
     Args:
         transactions (list): A list of transaction objects.
@@ -40,12 +42,12 @@ def generate_import_ids(transactions):
     import_ids = []
 
     for txn in transactions:
-        key = f"{txn.var_date}:{txn.amount}"  # Unique key based on transaction date and amount
-        count = counter[key]
-        suffix = f":{count}" if count > 0 else ""  # Add a suffix if there are duplicate keys
-        import_id = f"SYNCED:{key}{suffix}"  # Format the import ID
-        import_ids.append(import_id)
+        key = f"{txn.var_date}:{txn.amount}" # Unique key based on transaction date and amount
         counter[key] += 1
+        count = counter[key]
+        suffix = f":{count}" if count > 1 else "" # Add a suffix if there are duplicate keys
+        import_id = f"YNAB:{txn.amount}:{txn.var_date}{suffix}" # Format the import ID
+        import_ids.append(import_id)
 
     return import_ids
 
@@ -177,7 +179,7 @@ def delete_stale_transactions(api_b, budget_id_b, target_txns, source_import_ids
     """
     stale_txns = [
         txn for txn in target_txns
-        if txn.import_id and txn.import_id.startswith("SYNCED:") and txn.import_id not in source_import_ids
+        if txn.import_id and txn.import_id.startswith("YNAB:") and txn.import_id not in source_import_ids
     ]
 
     if stale_txns:
