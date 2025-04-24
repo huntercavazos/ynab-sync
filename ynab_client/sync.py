@@ -163,7 +163,7 @@ def classify_transactions(shared_txns, target_txns, import_ids, shared_account_i
     return new_txns, update_txns
 
 
-def delete_stale_transactions(api_b, budget_id_b, target_txns, source_import_ids, log):
+def delete_stale_transactions(api_b, budget_id_b, target_txns, source_import_ids, log, since_date):
     """
     Delete stale transactions from the target budget.
 
@@ -173,13 +173,21 @@ def delete_stale_transactions(api_b, budget_id_b, target_txns, source_import_ids
         target_txns (list): A list of transactions from the target budget.
         source_import_ids (set): A set of import IDs from the source transactions.
         log (Logger): The logger instance for logging errors.
+        since_date (date): The date range to delete stale transactions
 
     Returns:
         list: A list of stale transactions that were deleted.
     """
+    shared_account_id = CONFIG["shared_account_id"]
     stale_txns = [
         txn for txn in target_txns
-        if txn.import_id and txn.import_id.startswith("YNAB:") and txn.import_id not in source_import_ids
+        if (
+                txn.import_id and
+                txn.import_id.startswith("YNAB:") and
+                txn.import_id not in source_import_ids and
+                txn.account_id == shared_account_id and
+                txn.var_date >= since_date
+        )
     ]
 
     if stale_txns:
@@ -248,7 +256,7 @@ def sync_transactions():
         except ApiException as e:
             log.error(f"Failed to update transactions: {e}")
 
-    stale_txns = delete_stale_transactions(api_b, budget_id_b, target_txns, set(import_ids), log)
+    stale_txns = delete_stale_transactions(api_b, budget_id_b, target_txns, set(import_ids), log, since_date)
 
     if not new_txns and not update_txns and not stale_txns:
         log.info("No changes were necessary.")
