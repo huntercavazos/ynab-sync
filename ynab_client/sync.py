@@ -75,6 +75,9 @@ def fetch_source_transactions(api_a, budget_id_a, shared_category_id, shared_acc
 
     shared_txns = []
     for txn in source_txns:
+        if not txn.approved:
+            continue
+
         if txn.category_id == shared_category_id:
             shared_txns.append(NewTransaction(
                 account_id=shared_account_id,
